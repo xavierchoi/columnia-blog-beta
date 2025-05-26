@@ -1,0 +1,49 @@
+title: "Columnia"
+email: me@xavier.kr
+description: >-
+  A fast and easy markdown Jekyll blog theme with multilingual support.
+baseurl: "/columnia-blog-beta"
+url: "https://xavier.github.io/columnia-blog-beta"
+twitter_username: whereisxavier
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+safe: false
+
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
+      comments: true
+  - scope:
+      path: ""
+    values:
+      layout: "default"
+
+# 미래 포스트 허용
+future: true
+
+# 시간대 설정
+timezone: Asia/Seoul
+
+# Exclude from processing
+exclude:
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
+  - Gemfile
+  - Gemfile.lock
+  - node_modules/
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/

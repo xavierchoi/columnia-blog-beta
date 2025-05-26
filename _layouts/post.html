@@ -1,0 +1,248 @@
+---
+layout: default
+---
+
+<div class="content-area">
+    <article class="post-single">
+        <!-- Breadcrumbs -->
+        <nav class="breadcrumbs">
+            <div class="breadcrumb-item">
+                <a href="{{ '/' | relative_url }}" class="breadcrumb-link">홈</a>
+                <span class="breadcrumb-separator">›</span>
+            </div>
+            <div class="breadcrumb-item">
+                <a href="{{ '/categories' | relative_url }}" class="breadcrumb-link">카테고리</a>
+                <span class="breadcrumb-separator">›</span>
+            </div>
+            <div class="breadcrumb-item">
+                <a href="{{ '/categories/' | append: page.category | relative_url }}" class="breadcrumb-link">{{ page.category }}</a>
+                <span class="breadcrumb-separator">›</span>
+            </div>
+            <div class="breadcrumb-item">
+                <span class="breadcrumb-current">{{ page.title | truncate: 50 }}</span>
+            </div>
+        </nav>
+        
+        <header class="post-header">
+            <div class="post-meta">
+                <a href="{{ '/categories/' | append: page.category | relative_url }}" class="breadcrumb-link">{{ page.category }}</a>
+                <span>⏰ {{ page.date | date: "%B %d, %Y" }}</span>
+                <span class="reading-time">📖 {{ content | number_of_words | divided_by: 200 | at_least: 1 }} min read</span>
+            </div>
+            <h1 class="post-title">{{ page.title }}</h1>
+            {% if page.excerpt %}
+            <p class="post-excerpt">{{ page.excerpt }}</p>
+            {% endif %}
+            <div class="post-tags">
+                {% for tag in page.tags %}
+                <span class="post-tag tag-clickable" data-tag="{{ tag }}">{{ tag }}</span>
+                {% endfor %}
+            </div>
+        </header>
+        
+        <div class="post-content">
+            {{ content }}
+        </div>
+        
+        <!-- Share Buttons -->
+        <div class="post-share">
+            <h4>이 글을 공유하세요</h4>
+            <div class="share-buttons">
+                <a href="#" class="share-btn" data-platform="facebook" data-url="{{ page.url | absolute_url }}" data-title="{{ page.title }}" title="Facebook">📘</a>
+                <a href="#" class="share-btn" data-platform="twitter" data-url="{{ page.url | absolute_url }}" data-title="{{ page.title }}" title="Twitter">🐦</a>
+                <a href="#" class="share-btn" data-platform="linkedin" data-url="{{ page.url | absolute_url }}" data-title="{{ page.title }}" title="LinkedIn">💼</a>
+                <a href="#" class="share-btn" data-platform="kakao" data-url="{{ page.url | absolute_url }}" data-title="{{ page.title }}" title="KakaoTalk">💬</a>
+            </div>
+        </div>
+        
+        <!-- 스마트 관련 글 (진짜 관련성 기반) -->
+        {% comment %}
+        관련성 점수 계산:
+        - 같은 카테고리: +10점
+        - 공통 태그 1개당: +5점  
+        - 제목 키워드 일치: +3점
+        - 최신성 (30일 이내): +1점
+        {% endcomment %}
+        
+        {% assign current_post = page %}
+        {% assign related_posts_with_scores = "" | split: "" %}
+        
+        {% for post in site.posts %}
+            {% unless post.url == current_post.url %}
+                {% assign score = 0 %}
+                
+                <!-- 1. 같은 카테고리인지 확인 -->
+                {% if post.category == current_post.category %}
+                    {% assign score = score | plus: 10 %}
+                {% endif %}
+                
+                <!-- 2. 공통 태그 개수 계산 -->
+                {% assign common_tags = 0 %}
+                {% for current_tag in current_post.tags %}
+                    {% if post.tags contains current_tag %}
+                        {% assign common_tags = common_tags | plus: 1 %}
+                    {% endif %}
+                {% endfor %}
+                {% assign tag_score = common_tags | times: 5 %}
+                {% assign score = score | plus: tag_score %}
+                
+                <!-- 3. 제목 키워드 유사성 (간단한 버전) -->
+                {% assign current_title_words = current_post.title | downcase | split: " " %}
+                {% assign post_title_words = post.title | downcase | split: " " %}
+                {% assign title_matches = 0 %}
+                {% for current_word in current_title_words %}
+                    {% if current_word.size > 2 %}  <!-- 2글자 이상 단어만 -->
+                        {% if post_title_words contains current_word %}
+                            {% assign title_matches = title_matches | plus: 1 %}
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                {% assign title_score = title_matches | times: 3 %}
+                {% assign score = score | plus: title_score %}
+                
+                <!-- 4. 최신성 점수 (30일 이내면 +1점) -->
+                {% assign days_diff = 'now' | date: '%s' | minus: post.date | divided_by: 86400 %}
+                {% if days_diff < 30 %}
+                    {% assign score = score | plus: 1 %}
+                {% endif %}
+                
+                <!-- 점수가 있는 포스트만 추가 (최소 1점 이상) -->
+                {% if score > 0 %}
+                    {% assign post_with_score = post.url | append: "|" | append: score %}
+                    {% assign related_posts_with_scores = related_posts_with_scores | push: post_with_score %}
+                {% endif %}
+            {% endunless %}
+        {% endfor %}
+        
+        <!-- 점수순으로 정렬 (Liquid의 한계로 간단한 정렉) -->
+        {% assign sorted_related = related_posts_with_scores | sort | reverse %}
+        {% assign final_related_posts = "" | split: "" %}
+        
+        <!-- 상위 4개 선택 -->
+        {% for item in sorted_related limit: 4 %}
+            {% assign post_url = item | split: "|" | first %}
+            {% assign post_score = item | split: "|" | last %}
+            
+            {% for post in site.posts %}
+                {% if post.url == post_url %}
+                    {% assign final_related_posts = final_related_posts | push: post %}
+                    {% break %}
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+        
+        <!-- 관련 글이 있으면 표시 -->
+        {% if final_related_posts.size > 0 %}
+        <div class="related-posts-section">
+            <h3 class="related-posts-title">
+                관련 글 
+                <span class="related-count">({{ final_related_posts.size }}개)</span>
+            </h3>
+            <div class="related-posts-grid">
+                {% for post in final_related_posts %}
+                <article class="related-post-card">
+                    <div class="related-post-meta">
+                        <span class="related-post-category">{{ post.category }}</span>
+                        <span class="related-post-date">{{ post.date | date: "%m월 %d일" }}</span>
+                    </div>
+                    <h4 class="related-post-title">
+                        <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+                    </h4>
+                    {% if post.excerpt %}
+                    <p class="related-post-excerpt">{{ post.excerpt | strip_html | truncatewords: 12 }}</p>
+                    {% endif %}
+                    
+                    <!-- 관련성 힌트 표시 -->
+                    <div class="relation-hints">
+                        {% if post.category == current_post.category %}
+                            <span class="hint-tag category-match">같은 카테고리</span>
+                        {% endif %}
+                        
+                        {% assign common_tags_count = 0 %}
+                        {% for current_tag in current_post.tags %}
+                            {% if post.tags contains current_tag %}
+                                {% assign common_tags_count = common_tags_count | plus: 1 %}
+                            {% endif %}
+                        {% endfor %}
+                        {% if common_tags_count > 0 %}
+                            <span class="hint-tag tags-match">공통 태그 {{ common_tags_count }}개</span>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <!-- 관련 글이 없을 때 최신 글 3개 표시 -->
+        {% assign fallback_posts = site.posts | where_exp: "post", "post.url != page.url" | slice: 0, 3 %}
+        {% if fallback_posts.size > 0 %}
+        <div class="related-posts-section">
+            <h3 class="related-posts-title">다른 글들</h3>
+            <div class="related-posts-grid">
+                {% for post in fallback_posts %}
+                <article class="related-post-card">
+                    <div class="related-post-meta">
+                        <span class="related-post-category">{{ post.category }}</span>
+                        <span class="related-post-date">{{ post.date | date: "%m월 %d일" }}</span>
+                    </div>
+                    <h4 class="related-post-title">
+                        <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+                    </h4>
+                    {% if post.excerpt %}
+                    <p class="related-post-excerpt">{{ post.excerpt | strip_html | truncatewords: 12 }}</p>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+    </article>
+    
+    <!-- Navigation -->
+    <nav class="post-nav">
+        {% if page.previous %}
+        <div class="post-nav-item post-nav-prev">
+            <a href="{{ page.previous.url | relative_url }}">
+                <span class="post-nav-label">← 이전 글</span>
+                <span class="post-nav-title">{{ page.previous.title }}</span>
+            </a>
+        </div>
+        {% endif %}
+        
+        {% if page.next %}
+        <div class="post-nav-item post-nav-next">
+            <a href="{{ page.next.url | relative_url }}">
+                <span class="post-nav-label">다음 글 →</span>
+                <span class="post-nav-title">{{ page.next.title }}</span>
+            </a>
+        </div>
+        {% endif %}
+    </nav>
+</div>
+
+<!-- 사이드바 (목차와 카테고리만) -->
+<aside class="sidebar slide-in">
+    <!-- Table of Contents -->
+    {% if content contains '<h2>' or content contains '<h3>' %}
+    <div class="sidebar-section">
+        <h3 class="sidebar-title">목차</h3>
+        <div class="table-of-contents" id="tableOfContents">
+            <!-- TOC will be generated by JavaScript -->
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Categories -->
+    <div class="sidebar-section">
+        <h3 class="sidebar-title">카테고리</h3>
+        <div class="categories-list">
+            {% for category in site.categories limit: 8 %}
+            <div class="category-item">
+                <a href="{{ '/categories/' | append: category[0] | relative_url }}" class="category-link">{{ category[0] }}</a>
+                <span class="category-count">{{ category[1].size }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</aside>

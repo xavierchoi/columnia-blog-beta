@@ -1,0 +1,212 @@
+---
+layout: default
+title: "검색"
+permalink: /search/
+---
+
+<div class="content-area">
+    <div class="search-page">
+        <header class="search-header">
+            <h1>게시물 검색</h1>
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="검색어를 입력하세요..." autocomplete="off">
+                <button id="search-button" aria-label="검색">🔍</button>
+            </div>
+        </header>
+
+        <div id="search-results" class="search-results">
+            <div id="loading" class="search-loading" style="display: none;">
+                검색 중...
+            </div>
+            
+            <div id="no-results" class="no-results" style="display: none;">
+                <h3>검색 결과가 없습니다</h3>
+                <p>다른 키워드로 검색해보세요.</p>
+            </div>
+            
+            <div id="results-container" class="results-container">
+                <!-- 검색 결과가 여기에 표시됩니다 -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 사이드바 (카테고리만) -->
+<aside class="sidebar slide-in">
+    <div class="sidebar-section">
+        <h3 class="sidebar-title">카테고리</h3>
+        <div class="categories-list">
+            {% for category in site.categories %}
+            <div class="category-item">
+                <a href="{{ '/categories/' | append: category[0] | relative_url }}" class="category-link">{{ category[0] }}</a>
+                <span class="category-count">{{ category[1].size }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</aside>
+
+<!-- 포스트 데이터를 JSON으로 생성 -->
+<script id="posts-data" type="application/json">
+[
+{% for post in site.posts %}
+{
+    "title": {{ post.title | jsonify }},
+    "url": {{ post.url | jsonify }},
+    "excerpt": {{ post.excerpt | strip_html | jsonify }},
+    "content": {{ post.content | strip_html | truncatewords: 100 | jsonify }},
+    "category": {{ post.category | jsonify }},
+    "tags": {{ post.tags | jsonify }},
+    "date": {{ post.date | date: "%Y년 %m월 %d일" | jsonify }}
+}{% unless forloop.last %},{% endunless %}
+{% endfor %}
+]
+</script>
+
+<script>
+// 포스트 데이터 로드
+const postsData = JSON.parse(document.getElementById('posts-data').textContent);
+
+// URL에서 검색어 추출
+function getSearchQuery() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('q') || '';
+}
+
+// 검색 실행
+function performSearch(query) {
+    const resultsContainer = document.getElementById('results-container');
+    const noResults = document.getElementById('no-results');
+    const loading = document.getElementById('loading');
+    
+    if (!query.trim()) {
+        resultsContainer.innerHTML = '';
+        noResults.style.display = 'none';
+        return;
+    }
+
+    loading.style.display = 'block';
+    
+    const keywords = query.toLowerCase().split(' ').filter(k => k.length > 0);
+    const results = [];
+
+    postsData.forEach(post => {
+        let score = 0;
+        const titleLower = post.title.toLowerCase();
+        const contentLower = post.content.toLowerCase();
+        const categoryLower = post.category.toLowerCase();
+        const tagsLower = post.tags.map(tag => tag.toLowerCase());
+
+        keywords.forEach(keyword => {
+            // 제목에서 찾기 (가중치 높음)
+            if (titleLower.includes(keyword)) score += 10;
+            
+            // 카테고리에서 찾기
+            if (categoryLower.includes(keyword)) score += 7;
+            
+            // 태그에서 찾기
+            tagsLower.forEach(tag => {
+                if (tag.includes(keyword)) score += 5;
+            });
+            
+            // 내용에서 찾기
+            if (contentLower.includes(keyword)) score += 1;
+        });
+
+        if (score > 0) {
+            results.push({ post, score });
+        }
+    });
+
+    results.sort((a, b) => b.score - a.score);
+    
+    setTimeout(() => {
+        loading.style.display = 'none';
+        displayResults(results, query);
+    }, 300);
+}
+
+// 검색 결과 표시
+function displayResults(results, query) {
+    const container = document.getElementById('results-container');
+    const noResults = document.getElementById('no-results');
+
+    if (results.length === 0) {
+        container.innerHTML = '';
+        noResults.style.display = 'block';
+        return;
+    }
+
+    noResults.style.display = 'none';
+    
+    const html = `
+        <div class="results-count">
+            <strong>${results.length}개</strong>의 검색 결과를 찾았습니다.
+        </div>
+        ${results.map(({ post }) => `
+            <article class="search-result-item">
+                <div class="search-result-meta">
+                    <span class="search-result-date">${post.date}</span>
+                    <span class="search-result-category">${post.category}</span>
+                </div>
+                <h3 class="search-result-title">
+                    <a href="${post.url}">${highlightText(post.title, query)}</a>
+                </h3>
+                <p class="search-result-excerpt">${highlightText(post.excerpt, query)}</p>
+                <div class="search-result-tags">
+                    ${post.tags.map(tag => `<span class="search-result-tag">${tag}</span>`).join('')}
+                </div>
+            </article>
+        `).join('')}
+    `;
+    
+    container.innerHTML = html;
+}
+
+// 검색어 하이라이팅
+function highlightText(text, query) {
+    if (!query.trim()) return text;
+    
+    const keywords = query.split(' ').filter(k => k.length > 0);
+    let result = text;
+    
+    keywords.forEach(keyword => {
+        const regex = new RegExp(`(${keyword})`, 'gi');
+        result = result.replace(regex, '<mark>$1</mark>');
+    });
+    
+    return result;
+}
+
+// 페이지 로드 시 실행
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('search-input');
+    const searchButton = document.getElementById('search-button');
+    
+    // URL에서 검색어 가져와서 자동 검색
+    const initialQuery = getSearchQuery();
+    if (initialQuery) {
+        searchInput.value = initialQuery;
+        performSearch(initialQuery);
+    }
+    
+    // 검색 이벤트
+    searchInput.addEventListener('input', function() {
+        const query = this.value;
+        const url = new URL(window.location);
+        url.searchParams.set('q', query);
+        window.history.replaceState({}, '', url);
+        performSearch(query);
+    });
+    
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            performSearch(this.value);
+        }
+    });
+    
+    searchButton.addEventListener('click', function() {
+        performSearch(searchInput.value);
+    });
+});
+</script>
